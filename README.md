@@ -81,7 +81,7 @@ Installer options (environment variables):
 | `HADS_SETUP_ARGS="--yes --no-service"` | non-interactive setup, no login autostart |
 | `HADS_DL_URL=https://mirror/...` | download binaries + checksums from a mirror |
 
-From source (Go 1.22+): `git clone https://github.com/fernata-dev/hads && cd hads && make build && ./hads setup`.
+From source (Go 1.24+): `git clone https://github.com/fernata-dev/hads && cd hads && make build && ./hads setup`.
 </details>
 
 ## Using it

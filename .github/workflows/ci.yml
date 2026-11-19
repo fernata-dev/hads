@@ -17,10 +17,10 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: stable
       - name: vet
         run: go vet ./...
       - name: test
@@ -36,10 +36,10 @@ jobs:
     name: shell scripts
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: stable
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh fish shellcheck
       - run: go build -o hads ./cmd/hads
       - name: syntax
@@ -55,10 +55,10 @@ jobs:
     name: cross-compile
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: stable
       - run: VERSION=ci ./scripts/build.sh
       - uses: actions/upload-artifact@v4
         with:
