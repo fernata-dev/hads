@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-type="software">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>hads: the terminal that predicts your next command</title>
+<meta name="description" content="hads is a tiny on-device AI daemon for macOS, Linux and Windows. It predicts whole shell commands, knows your folders, and runs plain Arabic or English requests after you approve them.">
+<meta name="theme-color" content="#06090f">
+<meta property="og:type" content="website">
+<meta property="og:title" content="hads · حدس: the terminal that knows what you'll type next">
+<meta property="og:description" content="Whole-command predictions, on-device, every OS. One 7 MB binary.">
+<meta property="og:image" content="https://fernata-dev.github.io/hads/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500&family=IBM+Plex+Sans+Arabic:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}html,body{margin:0}
+:root{--bg:#06090f;--bg2:#0a0f17;--ink:#e9eef6;--soft:#b9c4d4;--muted:#8d99ab;--line:rgba(255,255,255,.09);--glass:rgba(255,255,255,.04);--acc:#4fe3c1;--acc2:#3aa0ff;--warm:#ffb86b;--r:18px;--wrap:min(100% - 48px,1200px);--sans:"Bricolage Grotesque",system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,Menlo,monospace}
+html[lang=ar]{--sans:"IBM Plex Sans Arabic","Bricolage Grotesque",sans-serif}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font:16px/1.65 var(--sans);overflow-x:hidden;-webkit-font-smoothing:antialiased}
+code,.mono{font-family:var(--mono);font-size:.92em}
+a{color:inherit}
+.wrap{width:var(--wrap);margin:0 auto;position:relative;z-index:1}
+.skip{position:absolute;left:-9999px}.skip:focus{left:16px;top:12px;z-index:50;background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:8px}
+:focus-visible{outline:2px solid var(--acc);outline-offset:3px;border-radius:6px}
+
+/* liquid ground */
+.liquid{position:fixed;inset:-10%;z-index:0;pointer-events:none;filter:blur(80px);opacity:.5}
+.blob{position:absolute;border-radius:50%}
+.b1{width:44vw;height:44vw;left:-6vw;top:-8vw;background:#0d5a74}
+.b2{width:36vw;height:36vw;right:-6vw;top:26vh;background:#0e6b55}
+.b3{width:34vw;height:34vw;left:34vw;bottom:-12vw;background:#173f86}
+.grain{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.05;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+/* nav */
+header{position:fixed;inset:0 0 auto;z-index:20;height:68px;display:flex;align-items:center;background:rgba(6,9,15,.6);backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%);border-bottom:1px solid var(--line)}
+header .wrap{display:flex;align-items:center;gap:28px}
+.logo{display:flex;align-items:center;gap:10px;font:500 20px var(--sans);text-decoration:none;white-space:nowrap}
+.logo svg{flex:none}
+.logo small{font:400 15px "IBM Plex Sans Arabic",sans-serif;color:var(--muted)}
+nav.links{display:flex;gap:22px;margin-inline-start:auto}
+nav.links a{text-decoration:none;color:var(--muted);font-size:15px;transition:color .2s}nav.links a:hover{color:var(--ink)}
+.tools{display:flex;gap:10px;align-items:center}
+.lang{height:40px;min-width:44px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:var(--glass);color:var(--ink);font:500 14px var(--sans);cursor:pointer}
+.lang:hover{border-color:rgba(255,255,255,.25)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;height:46px;padding:0 22px;border-radius:999px;border:1px solid var(--line);background:var(--glass);backdrop-filter:blur(12px);color:var(--ink);text-decoration:none;font:500 15px/1 var(--sans);cursor:pointer;transition:transform .2s,background .2s,border-color .2s;white-space:nowrap}
+.btn:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.24);background:rgba(255,255,255,.07)}.btn:active{transform:translateY(0) scale(.98)}
+.btn--p{background:var(--acc);color:#04141a;border:0}.btn--p:hover{background:#6ff0d2}
+.btn svg{width:18px;height:18px}
+
+/* hero */
+.hero{min-height:100svh;padding:132px 0 56px;display:flex;align-items:center}
+.hero .wrap{display:grid;grid-template-columns:1fr 1.06fr;gap:56px;align-items:center}
+.pill{display:inline-flex;gap:10px;align-items:center;padding:6px 14px;border-radius:999px;border:1px solid var(--line);background:var(--glass);font-size:13px;color:var(--soft)}
+.pill b{width:7px;height:7px;border-radius:50%;background:var(--acc)}
+h1{font-size:clamp(40px,5.4vw,74px);line-height:1.04;letter-spacing:-.035em;font-weight:500;margin:22px 0 18px}
+html[lang=ar] h1{letter-spacing:0;line-height:1.25;font-size:clamp(36px,4.6vw,64px)}
+h1 em{font-style:normal;color:var(--acc)}
+.lead{font-size:clamp(17px,1.5vw,20px);color:var(--soft);max-width:31em;margin:0 0 30px}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.facts{display:grid;grid-template-columns:repeat(4,auto);gap:28px;margin-top:40px;color:var(--muted);font-size:13.5px;justify-content:start}
+.facts b{display:block;color:var(--ink);font:500 26px/1.2 "Bricolage Grotesque",sans-serif;letter-spacing:-.02em}.facts b bdi{unicode-bidi:isolate;direction:ltr;display:inline-block}
+
+/* terminal */
+.term{direction:ltr;text-align:left;border-radius:var(--r);background:rgba(11,16,24,.72);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(24px) saturate(150%);-webkit-backdrop-filter:blur(24px) saturate(150%);box-shadow:0 40px 100px -40px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.1);overflow:hidden;position:relative;transform-style:preserve-3d}
+.term__bar{display:flex;gap:8px;align-items:center;padding:13px 18px;border-bottom:1px solid var(--line);font:12.5px var(--mono);color:var(--muted)}
+.term__bar i{width:11px;height:11px;border-radius:50%;background:#ff5f57}.term__bar i:nth-child(2){background:#febc2e}.term__bar i:nth-child(3){background:#28c840}
+.term__bar span{margin-left:auto}
+.term__body{padding:22px 22px 26px;font:14px/1.8 var(--mono);min-height:330px;white-space:pre-wrap;word-break:break-word}
+.p{color:var(--acc)}.ghost{color:#74839a}.cmt{color:#8794a8}.ok{color:#7ee2a8}.hl{color:var(--warm)}.b{color:var(--ink);font-weight:500}
+.cur{display:inline-block;width:8px;height:16px;background:var(--ink);vertical-align:-3px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.why{display:inline-block;margin-left:8px;padding:0 8px;border-radius:6px;background:rgba(79,227,193,.1);color:var(--acc);font-size:11.5px;line-height:20px}
+.rtl{direction:rtl;unicode-bidi:isolate;font-family:"IBM Plex Sans Arabic",var(--mono)}
+
+/* sections */
+section{padding:128px 0;position:relative}
+.eyebrow{font:500 13px var(--mono);color:var(--acc);margin:0 0 14px}
+h2{font-size:clamp(30px,3.5vw,50px);line-height:1.1;letter-spacing:-.03em;font-weight:500;margin:0 0 18px;max-width:20em}
+html[lang=ar] h2{letter-spacing:0;line-height:1.35}
+h2 .m{color:var(--muted)}
+.sub{color:var(--soft);font-size:18px;max-width:40em;margin:0 0 52px}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.card{border-radius:var(--r);padding:28px;background:var(--glass);border:1px solid var(--line);transition:transform .3s,border-color .3s}
+.card:hover{transform:translateY(-3px);border-color:rgba(79,227,193,.3)}
+.card h3{font-size:20px;font-weight:500;margin:0 0 8px;letter-spacing:-.01em;display:flex;gap:10px;align-items:baseline}
+.card h3 span{font:500 14px var(--mono);color:var(--acc)}
+.card p{margin:0;color:#aab5c5}
+.mini{direction:ltr;text-align:left;margin-top:20px;padding:12px 14px;border-radius:10px;background:rgba(0,0,0,.35);font:13px/1.7 var(--mono);color:#c9d3e0;white-space:nowrap;overflow:hidden;text-overflow:clip}
+.split{display:grid;grid-template-columns:1fr 1.1fr;gap:64px;align-items:center}
+
+/* signals */
+.signals{display:grid;gap:14px;margin-top:40px}
+.sig{display:grid;grid-template-columns:200px 1fr 64px;gap:16px;align-items:center;font-size:15px}
+.sig .bar{height:8px;border-radius:99px;background:rgba(255,255,255,.06);overflow:hidden}
+.sig .bar i{display:block;height:100%;width:var(--w);background:linear-gradient(90deg,var(--acc2),var(--acc));border-radius:inherit;transform-origin:left}
+html[dir=rtl] .sig .bar i{transform-origin:right}
+.sig .v{font:500 13px var(--mono);color:var(--muted);text-align:end}
+.verdict{margin-top:26px;padding:16px 18px;border-radius:14px;border:1px solid rgba(79,227,193,.3);background:rgba(79,227,193,.06);font:14px var(--mono);direction:ltr;text-align:left}
+
+.steps{list-style:none;padding:0;margin:0;display:grid;gap:12px}
+.steps li{display:flex;gap:14px;align-items:flex-start;padding:16px 18px;border-radius:14px;background:var(--glass);border:1px solid var(--line)}
+.steps li b{font:500 13px var(--mono);color:var(--acc);min-width:24px;padding-top:2px}
+
+.trio{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.trio .card h3{font-size:19px}
+
+/* install */
+.install{border-radius:28px;padding:56px;background:linear-gradient(150deg,rgba(79,227,193,.07),rgba(58,160,255,.04) 55%,rgba(255,255,255,.015));border:1px solid rgba(255,255,255,.12)}
+.tabs{display:inline-flex;gap:4px;padding:4px;border-radius:999px;background:rgba(0,0,0,.3);border:1px solid var(--line);margin-bottom:18px}
+.tabs button{border:0;background:none;color:var(--muted);font:500 14px var(--sans);padding:0 18px;height:40px;border-radius:999px;cursor:pointer;transition:all .2s}
+.tabs button[aria-selected=true]{background:rgba(255,255,255,.1);color:var(--ink)}
+.cmd{direction:ltr;display:flex;align-items:center;gap:14px;padding:16px 18px;border-radius:14px;background:rgba(0,0,0,.45);border:1px solid var(--line);font:15px var(--mono)}
+.cmd code{flex:1;overflow-x:auto;white-space:nowrap;scrollbar-width:none}.cmd .p{user-select:none}
+.copy{flex:none;height:40px;padding:0 16px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--ink);cursor:pointer;font:500 13px var(--sans);min-width:84px}
+.copy:hover{background:rgba(255,255,255,.12)}
+.dl{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:28px}
+.dl a{display:flex;flex-direction:column;gap:2px;padding:14px 18px;border-radius:14px;border:1px solid var(--line);background:var(--glass);text-decoration:none;transition:transform .2s,border-color .2s;font-weight:500}
+.dl a:hover{transform:translateY(-2px);border-color:rgba(79,227,193,.4)}.dl a.me{border-color:var(--acc)}
+.dl small{color:var(--muted);font-size:13px;font-weight:400}
+.note{color:var(--muted);font-size:14px;margin-top:22px}
+.note a{color:var(--soft)}
+
+/* faq */
+.faq{display:grid;grid-template-columns:1fr 1fr;gap:20px 48px}
+.faq h3{font-size:18px;font-weight:500;margin:0 0 6px}
+.faq p{margin:0;color:#aab5c5}
+.faq div{padding:22px 0;border-top:1px solid var(--line)}
+
+footer{padding:88px 0 40px;border-top:1px solid var(--line);color:var(--muted);font-size:14px;position:relative;z-index:1}
+.marq{font:500 clamp(68px,13vw,200px)/1 var(--sans);letter-spacing:-.05em;color:rgba(255,255,255,.07);margin:0 0 40px;white-space:nowrap}
+.foot{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.foot nav{display:flex;gap:20px;flex-wrap:wrap}
+.foot a{text-decoration:none}.foot a:hover{color:var(--ink)}
+
+@media (max-width:1080px){nav.links{display:none}.tools{margin-inline-start:auto}}
+@media (max-width:960px){
+  .hero .wrap,.split{grid-template-columns:1fr;gap:40px}
+  .cards,.trio,.faq{grid-template-columns:1fr}
+  .dl{grid-template-columns:1fr 1fr}
+  .install{padding:32px 20px}
+  .facts{grid-template-columns:repeat(2,auto);gap:20px 32px}
+  .sig{grid-template-columns:130px 1fr 52px;font-size:14px}
+  section{padding:96px 0}
+}
+@media (max-width:560px){
+  .gh-text,.logo small{display:none}
+  header .wrap{gap:12px}.tools{gap:8px}
+  header .btn{height:40px;padding:0 14px}
+  .cmd{align-items:flex-start}.cmd code{white-space:normal;word-break:break-all}
+  .term__body{font-size:12px;min-height:290px;padding:18px}
+  .row .btn{flex:1}
+  .cmd{font-size:13px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<a class="skip" href="#top" data-i18n="skip">Skip to content</a>
+<div class="liquid" aria-hidden="true"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
+<div class="grain" aria-hidden="true"></div>
+
+<header><div class="wrap">
+  <a class="logo" href="#top" aria-label="hads home">
+    <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><rect width="28" height="28" rx="8" fill="#4fe3c1"/><path d="M8 9l5 5-5 5" stroke="#04141a" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 19h6" stroke="#04141a" stroke-width="2.4" stroke-linecap="round"/></svg>
+    hads <small>حدس</small></a>
+  <nav class="links" aria-label="Sections">
+    <a href="#predict" data-i18n="nPredict">Prediction</a><a href="#files" data-i18n="nFiles">Files</a><a href="#smart" data-i18n="nSmart">Smart mode</a><a href="#privacy" data-i18n="nPrivacy">Privacy</a><a href="#faq" data-i18n="nFaq">FAQ</a>
+  </nav>
+  <div class="tools">
+    <button class="lang" id="lang" type="button" aria-label="Switch language">ع</button>
+    <a class="btn" href="https://github.com/fernata-dev/hads" aria-label="hads on GitHub"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><span class="gh-text">GitHub</span></a>
+    <a class="btn btn--p" href="#install" data-i18n="install">Install</a>
+  </div>
+</div></header>
+
+<main id="top">
+<section class="hero"><div class="wrap">
+  <div>
+    <span class="pill" data-in><b></b><span data-i18n="pill">v1.0 · macOS · Linux · Windows · BSD</span></span>
+    <h1 id="h1" data-i18n="h1">Your terminal knows the <em>next command</em> before you type it.</h1>
+    <p class="lead" data-in data-i18n="lead">hads is a tiny AI daemon that learns how you work and maps every folder you own. It writes the whole next command as ghost text. Press → and it runs.</p>
+    <div class="row" data-in><a class="btn btn--p" href="#install" data-i18n="cta1">Install in one command</a><a class="btn" href="#smart" data-i18n="cta2">See smart mode</a></div>
+    <div class="facts" data-in>
+      <div><b><bdi><span data-count="4">4</span> ms</bdi></b><span data-i18n="f1">per keystroke</span></div>
+      <div><b><bdi>7 MB</bdi></b><span data-i18n="f2">one binary</span></div>
+      <div><b><bdi>100%</bdi></b><span data-i18n="f3">on-device</span></div>
+      <div><b><span data-count="4">4</span></b><span data-i18n="f4">shells</span></div>
+    </div>
+  </div>
+  <div class="term" id="heroTerm" role="img" aria-label="A terminal where hads predicts full commands as ghost text">
+    <div class="term__bar"><i></i><i></i><i></i><span>~/projects/webapp — zsh</span></div>
+    <div class="term__body" id="demo"></div>
+  </div>
+</div></section>
+
+<section id="predict"><div class="wrap">
+  <p class="eyebrow" data-rv>01 / prediction</p>
+  <h2 data-rv data-i18n="pH">A model of you, not of everyone. <span class="m">It learns from your own history.</span></h2>
+  <p class="sub" data-rv data-i18n="pSub">A small statistical model over your command stream, blended with the folder you're in, your git state and your project files. It learns with every Enter and never leaves your machine.</p>
+  <div class="cards">
+    <article class="card" data-rv><h3><span>↦</span><b data-i18n="c1t">The next command</b></h3><p data-i18n="c1p">After a commit it already shows the push. After a clone, the cd into it.</p><div class="mini"><span class="p">❯</span> <span class="ghost">git push</span><span class="why">after commit</span></div></article>
+    <article class="card" data-rv><h3><span>⌁</span><b data-i18n="c2t">Typos fixed early</b></h3><p data-i18n="c2p">Type <code>gti pu</code> and it offers <code>git push</code>, finished from your own history.</p><div class="mini"><span class="p">❯</span> gti pu <span class="ghost">⟶ git push</span></div></article>
+    <article class="card" data-rv><h3><span>◫</span><b data-i18n="c3t">Projects understood</b></h3><p data-i18n="c3p">Walk into a Node, Rust, Go, Python or Docker project and its real scripts come first.</p><div class="mini"><span class="p">❯</span> <span class="ghost">npm run dev</span><span class="why">package.json</span></div></article>
+  </div>
+
+  <div class="signals" id="signals" aria-label="Why hads predicted git push">
+    <div class="sig"><span data-i18n="s1">After <code>git commit</code></span><div class="bar"><i style="--w:92%"></i></div><span class="v">+5.5</span></div>
+    <div class="sig"><span data-i18n="s2">Git: 1 commit ahead</span><div class="bar"><i style="--w:58%"></i></div><span class="v">+3.4</span></div>
+    <div class="sig"><span data-i18n="s3">Often run in this folder</span><div class="bar"><i style="--w:40%"></i></div><span class="v">+2.3</span></div>
+    <div class="sig"><span data-i18n="s4">Frecency, last 14 days</span><div class="bar"><i style="--w:24%"></i></div><span class="v">+1.4</span></div>
+    <div class="verdict"><span class="p">❯</span> <span class="ghost">git push</span>  <span class="cmt">score 12.6 · 0.012 ms</span></div>
+  </div>
+</div></section>
+
+<section id="files"><div class="wrap split">
+  <div>
+    <p class="eyebrow" data-rv>02 / files</p>
+    <h2 data-rv data-i18n="fH">It has seen every folder. <span class="m">So a copy takes three keys.</span></h2>
+    <p class="sub" data-rv data-i18n="fSub">A gentle background index of your home folder feeds the predictor. Type <code>cp rep</code> and hads writes the file and the place you always copy it to.</p>
+    <ul class="steps">
+      <li data-rv><b>01</b><span data-i18n="fs1">Indexes up to 250,000 files at low priority, and rescans every 30 minutes.</span></li>
+      <li data-rv><b>02</b><span data-i18n="fs2">Jumps anywhere you've been: <code>cd web</code> becomes <code>cd ~/code/webapp</code>.</span></li>
+      <li data-rv><b>03</b><span data-i18n="fs3"><code>hads find taxes</code> searches your disk in about a millisecond.</span></li>
+    </ul>
+  </div>
+  <div class="term" data-rv><div class="term__bar"><i></i><i></i><i></i><span>hads find</span></div>
+    <div class="term__body" style="min-height:0"><span class="p">❯</span> cp rep<span class="ghost">  ⟶ cp Documents/report-2026.pdf ~/Desktop/</span>
+<span class="cmt">  ↳ copy to where you usually do: ~/Desktop</span>
+
+<span class="p">❯</span> cd web<span class="ghost">  ⟶ cd ~/code/webapp</span>
+
+<span class="p">❯</span> hads find taxes
+  <span class="hl">▤</span>   48K  ~/Documents/<span class="b">My Taxes.xlsx</span>    2026-11-02
+  <span class="hl">▤</span>   12K  ~/Downloads/<span class="b">taxes-2025.pdf</span>   2026-03-14
+  <span class="cmt">2 results · 1.2ms</span></div></div>
+</div></section>
+
+<section id="smart"><div class="wrap split">
+  <div>
+    <p class="eyebrow" data-rv>03 / smart mode</p>
+    <h2 data-rv data-i18n="sH">Say it in Arabic or English. <span class="m">Review the plan, then it runs.</span></h2>
+    <p class="sub" data-rv data-i18n="sSub">Off until you add your OpenRouter key. Type <code>?</code> and a request. hads reads your OS and package managers, plans exact commands, flags risky ones, blocks destructive ones, and repairs a step that fails.</p>
+    <ul class="steps">
+      <li data-rv><b>✓</b><span data-i18n="ss1">Plans for this machine: pacman on Arch, apt on Ubuntu, brew on macOS, winget on Windows.</span></li>
+      <li data-rv><b>✓</b><span data-i18n="ss2">Nothing runs until you approve: all at once, step by step, or cancel.</span></li>
+      <li data-rv><b>✓</b><span data-i18n="ss3">A local guard the model can't override blocks <code>rm -rf /</code>, <code>mkfs</code> and their kin.</span></li>
+    </ul>
+  </div>
+  <div class="term" data-rv><div class="term__bar"><i></i><i></i><i></i><span>smart mode</span></div>
+    <div class="term__body" id="smartdemo" style="min-height:400px"></div></div>
+</div></section>
+
+<section id="privacy"><div class="wrap">
+  <p class="eyebrow" data-rv>04 / privacy</p>
+  <h2 data-rv data-i18n="vH">Your history stays yours. <span class="m">Nothing to sign up for.</span></h2>
+  <p class="sub" data-rv data-i18n="vSub">Prediction runs entirely on your machine. The only network call is smart mode, and only when you turn it on.</p>
+  <div class="trio">
+    <article class="card" data-rv><h3><span>◎</span><b data-i18n="v1t">On-device model</b></h3><p data-i18n="v1p">History, index and model live in your config folder with 0600 permissions, behind a user-only socket.</p></article>
+    <article class="card" data-rv><h3><span>✕</span><b data-i18n="v2t">Secrets never stored</b></h3><p data-i18n="v2p">Tokens, passwords, API keys and auth headers are dropped before they reach the model or the disk.</p></article>
+    <article class="card" data-rv><h3><span>#</span><b data-i18n="v3t">Verified installs</b></h3><p data-i18n="v3p">The installer checks every binary against its SHA-256 and refuses on a mismatch. MIT-licensed, open source.</p></article>
+  </div>
+</div></section>
+
+<section id="install"><div class="wrap">
+  <div class="install" data-rv>
+    <p class="eyebrow">05 / install</p>
+    <h2 data-i18n="iH">Install it with one command.</h2>
+    <p class="sub" style="margin-bottom:28px" data-i18n="iSub">The installer detects your OS and CPU, verifies the binary, wires zsh, bash, fish and PowerShell, and starts the daemon at login.</p>
+    <div class="tabs" role="tablist" aria-label="Operating system">
+      <button role="tab" type="button" data-os="unix" aria-selected="true">macOS · Linux</button>
+      <button role="tab" type="button" data-os="win" aria-selected="false">Windows</button>
+    </div>
+    <div class="cmd"><span class="p">❯</span><code id="cmd"></code><button class="copy" id="copy" type="button" data-i18n="copy">Copy</button></div>
+    <div class="dl" id="dl">
+      <a href="https://github.com/fernata-dev/hads/releases/latest/download/hads-darwin-arm64" data-k="mac-arm">macOS<small>Apple silicon</small></a>
+      <a href="https://github.com/fernata-dev/hads/releases/latest/download/hads-darwin-amd64" data-k="mac-x64">macOS<small>Intel</small></a>
+      <a href="https://github.com/fernata-dev/hads/releases/latest/download/hads-linux-amd64" data-k="linux-x64">Linux<small>x86-64</small></a>
+      <a href="https://github.com/fernata-dev/hads/releases/latest/download/hads-linux-arm64" data-k="linux-arm">Linux<small>ARM64 · Raspberry Pi</small></a>
+      <a href="https://github.com/fernata-dev/hads/releases/latest/download/hads-windows-amd64.exe" data-k="win-x64">Windows<small>x64</small></a>
+      <a href="https://github.com/fernata-dev/hads/releases/latest/download/hads-windows-arm64.exe" data-k="win-arm">Windows<small>ARM64</small></a>
+      <a href="https://github.com/fernata-dev/hads/releases/latest/download/hads-linux-arm">Linux<small>ARMv7</small></a>
+      <a href="https://github.com/fernata-dev/hads/releases/latest/download/hads-freebsd-amd64">FreeBSD<small>x86-64</small></a>
+    </div>
+    <p class="note"><span data-i18n="keys">Then open a new terminal:</span> <code>→</code> accept · <code>Ctrl+Space</code> fill · <code>Alt+N</code> alternatives · <code>? request</code> smart mode · <a href="https://github.com/fernata-dev/hads/releases/latest/download/checksums.txt">checksums</a></p>
+  </div>
+</div></section>
+
+<section id="faq"><div class="wrap">
+  <p class="eyebrow" data-rv>06 / faq</p>
+  <h2 data-rv data-i18n="qH">Questions, answered.</h2>
+  <div class="faq">
+    <div data-rv><h3 data-i18n="q1">Is it a large language model?</h3><p data-i18n="a1">No. Prediction is a small statistical model trained only on your commands, which is why it answers in microseconds and needs no internet. Smart mode alone uses an LLM, through OpenRouter.</p></div>
+    <div data-rv><h3 data-i18n="q2">Will it slow my shell down?</h3><p data-i18n="a2">Predictions are fetched asynchronously in zsh, so typing never waits. A full round trip takes about 4 ms, even on a 2014 laptop.</p></div>
+    <div data-rv><h3 data-i18n="q3">I already use zsh-autosuggestions.</h3><p data-i18n="a3">Keep it. hads registers itself as its first strategy instead of replacing it.</p></div>
+    <div data-rv><h3 data-i18n="q4">How do I remove it?</h3><p data-i18n="a4"><code>hads uninstall --purge</code> removes the hooks, the autostart and everything it learned.</p></div>
+  </div>
+</div></section>
+</main>
+
+<footer><div class="wrap">
+  <div class="marq" aria-hidden="true">hads · حدس</div>
+  <div class="foot">
+    <span>© <span id="y">2026</span> hads · <span data-i18n="ft">MIT licensed, built in Go.</span></span>
+    <nav aria-label="Footer"><a href="https://github.com/fernata-dev/hads">GitHub</a><a href="https://github.com/fernata-dev/hads/releases">Releases</a><a href="https://github.com/fernata-dev/hads/issues">Issues</a><a href="https://github.com/fernata-dev/hads/blob/main/README.ar.md">العربية</a></nav>
+  </div>
+</div></footer>
+
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/SplitText.min.js"></script>
+<script>
+const AR = {
+  skip:'تخطّى للمحتوى', nPredict:'التوقّع', nFiles:'الملفات', nSmart:'الوضع الذكي', nPrivacy:'الخصوصية', nFaq:'أسئلة', install:'ثبّت',
+  pill:'الإصدار 1.0 · ماك · لينكس · ويندوز · BSD',
+  h1:'التيرمنال بتاعك عارف <em>الأمر الجاي</em> قبل ما تكتبه.',
+  lead:'حدس ديمون ذكاء اصطناعي صغير بيتعلّم طريقتك في الشغل وبيعرف كل فولدر عندك. بيكتبلك الأمر الجاي كامل كنص باهت، ودوسة → وخلاص.',
+  cta1:'ثبّته بأمر واحد', cta2:'شوف الوضع الذكي', f1:'لكل ضغطة', f2:'ملف واحد', f3:'على جهازك', f4:'شِل',
+  pH:'نموذج ليك انت، مش للناس كلها. <span class="m">بيتعلّم من سجل أوامرك.</span>',
+  pSub:'نموذج إحصائي صغير على أوامرك، بيحسب الفولدر اللي انت فيه وحالة git وملفات المشروع. بيتعلّم مع كل Enter وعمره ما بيخرج من جهازك.',
+  c1t:'الأمر الجاي', c1p:'بعد الـ commit بيعرض الـ push، وبعد الـ clone بيعرض الـ cd.',
+  c2t:'بيصلّح الغلط بدري', c2p:'اكتب <code>gti pu</code> وهيقترح <code>git push</code> من سجلّك.',
+  c3t:'فاهم المشروع', c3p:'ادخل مشروع Node أو Rust أو Go أو Python أو Docker وسكربتاته هتظهر الأول.',
+  s1:'بعد <code>git commit</code>', s2:'git: فيه commit مارفعش', s3:'بتشغّله كتير في الفولدر ده', s4:'الأحدث والأكتر استخدامًا',
+  fH:'شاف كل فولدر عندك. <span class="m">فالنسخ بقى تلات زراير.</span>',
+  fSub:'فهرس هادي لفولدر الهوم في الخلفية. اكتب <code>cp rep</code> وحدس يكتب الملف والمكان اللي بتنسخ له دايمًا.',
+  fs1:'بيفهرس لحد 250,000 ملف بأولوية منخفضة، وبيعيد كل 30 دقيقة.',
+  fs2:'بيوديك أي مكان رحته قبل كده: <code>cd web</code> بتبقى <code>cd ~/code/webapp</code>.',
+  fs3:'<code>hads find taxes</code> بيدوّر في الديسك في حوالي ملّي ثانية.',
+  sH:'قولها بالعربي أو بالإنجليزي. <span class="m">راجع الخطة، وبعدين تتنفّذ.</span>',
+  sSub:'مقفول لحد ما تضيف مفتاح OpenRouter. اكتب <code>?</code> وطلبك، وحدس يعرف نظامك ومدير الباكدجات، يجهّز الأوامر، يعلّم على الخطير، يمنع المدمّر، ويصلّح الخطوة اللي تفشل.',
+  ss1:'بيخطط لجهازك: pacman على Arch، وapt على Ubuntu، وbrew على ماك، وwinget على ويندوز.',
+  ss2:'مفيش حاجة بتتنفّذ من غير موافقتك: الكل مرة واحدة، أو خطوة بخطوة، أو إلغاء.',
+  ss3:'حماية محلية الموديل مايقدرش يتخطّاها، بتمنع <code>rm -rf /</code> و<code>mkfs</code> وأخواتهم.',
+  vH:'سجلّك ملكك. <span class="m">مفيش تسجيل ولا حسابات.</span>', vSub:'التوقّع شغّال على جهازك بالكامل. الاتصال الوحيد بالنت هو الوضع الذكي، ولما انت تفعّله بس.',
+  v1t:'نموذج على جهازك', v1p:'السجل والفهرس والنموذج في فولدر الإعدادات بصلاحيات 0600، ومن ورا socket ليك انت بس.',
+  v2t:'الأسرار مابتتسجّلش', v2p:'التوكنز والباسوردات ومفاتيح API بتترمي قبل ما توصل للنموذج أو الديسك.',
+  v3t:'تثبيت متأكّد منه', v3p:'المثبّت بيتأكد من SHA-256 لكل ملف وبيرفض لو مش مطابق. مفتوح المصدر برخصة MIT.',
+  iH:'ثبّته بأمر واحد.', iSub:'المثبّت بيعرف نظامك والمعالج، بيتأكد من الملف، بيربط zsh وbash وfish وPowerShell، وبيشغّل الديمون مع الجهاز.',
+  copy:'انسخ', keys:'وبعدين افتح تيرمنال جديد:',
+  qH:'أسئلة وأجوبتها.',
+  q1:'هو موديل لغة كبير؟', a1:'لأ. التوقّع نموذج إحصائي صغير متدرّب على أوامرك بس، وعشان كده بيرد في ميكروثواني ومش محتاج نت. الوضع الذكي بس هو اللي بيستخدم LLM عن طريق OpenRouter.',
+  q2:'هيبطّأ الشِل؟', a2:'في zsh التوقعات بتيجي في الخلفية فالكتابة عمرها ما بتستنى. الرحلة كلها حوالي 4 ملّي ثانية حتى على لابتوب من 2014.',
+  q3:'أنا بستخدم zsh-autosuggestions.', a3:'خليه. حدس بيسجّل نفسه كأول استراتيجية فيه بدل ما يشيله.',
+  q4:'أشيله إزاي؟', a4:'<code>hads uninstall --purge</code> بيشيل الهوكس والتشغيل التلقائي وكل اللي اتعلّمه.',
+  ft:'مفتوح المصدر برخصة MIT، ومكتوب بـ Go.'
+};
+const EN = {};
+document.querySelectorAll('[data-i18n]').forEach(el => EN[el.dataset.i18n] = el.innerHTML);
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches || /[?&]still\b/.test(location.search);
+let lang = localStorage.getItem('hads-lang') || ((navigator.language || '').startsWith('ar') ? 'ar' : 'en');
+function applyLang(l, animate) {
+  lang = l; localStorage.setItem('hads-lang', l);
+  const d = document.documentElement; d.lang = l; d.dir = l === 'ar' ? 'rtl' : 'ltr';
+  const dict = l === 'ar' ? AR : EN;
+  document.querySelectorAll('[data-i18n]').forEach(el => { const k = el.dataset.i18n; if (dict[k] != null) el.innerHTML = dict[k]; });
+  const b = document.getElementById('lang'); b.textContent = l === 'ar' ? 'EN' : 'ع'; b.setAttribute('aria-label', l === 'ar' ? 'English' : 'العربية');
+  if (animate && window.gsap && !reduce) gsap.from('main h1, main h2, .lead, .sub', {opacity: 0, y: 12, duration: .6, stagger: .02, ease: 'power2.out'});
+}
+applyLang(lang, false);
+document.getElementById('lang').onclick = () => applyLang(lang === 'ar' ? 'en' : 'ar', true);
+document.getElementById('y').textContent = new Date().getFullYear();
+
+// install command + platform
+const cmds = {unix: 'curl -fsSL https://fernata-dev.github.io/hads/install.sh | sh', win: 'irm https://raw.githubusercontent.com/fernata-dev/hads/main/scripts/install.ps1 | iex'};
+const ua = navigator.userAgent;
+let os = /Windows/.test(ua) ? 'win' : 'unix';
+const cmdEl = document.getElementById('cmd');
+function setOS(o) { os = o; cmdEl.textContent = cmds[o]; document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.os === o)); }
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => setOS(b.dataset.os)); setOS(os);
+document.getElementById('copy').onclick = async e => {
+  const btn = e.currentTarget, label = btn.textContent;
+  try { await navigator.clipboard.writeText(cmds[os]); btn.textContent = lang === 'ar' ? 'اتنسخ ✓' : 'Copied ✓'; }
+  catch { getSelection().selectAllChildren(cmdEl); }
+  setTimeout(() => btn.textContent = label, 1600);
+};
+const k = /Windows/.test(ua) ? 'win-x64' : /Mac/.test(ua) ? 'mac-arm' : /Linux/.test(ua) ? (/aarch64|arm/i.test(ua) ? 'linux-arm' : 'linux-x64') : '';
+if (k) document.querySelector(`[data-k="${k}"]`)?.classList.add('me');
+
+// hero terminal: typing + ghost text
+const demo = document.getElementById('demo');
+const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+const scenes = [
+  {typed: 'git com', ghost: 'mit -m "fix: login redirect"', why: 'after git add'},
+  {typed: '', ghost: 'git push', why: '1 commit not pushed'},
+  {typed: 'cp rep', full: 'cp Documents/report-2026.pdf ~/Desktop/', why: 'your usual spot'},
+  {typed: 'cd web', full: 'cd ~/code/webapp', why: 'frequent folder'},
+  {typed: 'gti st', full: 'git status', why: 'typo fixed'},
+];
+const done = [];
+const wait = ms => new Promise(r => setTimeout(r, ms));
+const render = (line, cursor = true) => demo.innerHTML = done.join('\n') + (done.length ? '\n' : '') + line + (cursor ? '<span class="cur"></span>' : '');
+async function play() {
+  if (reduce) { demo.innerHTML = scenes.map(s => `<span class="p">❯</span> ${esc(s.full || s.typed + s.ghost)} <span class="ok">✔</span>`).join('\n'); return; }
+  for (;;) {
+    done.length = 0;
+    for (const s of scenes) {
+      let t = '';
+      for (const ch of s.typed) { t += ch; render(`<span class="p">❯</span> ${esc(t)}`); await wait(70 + Math.random() * 60); }
+      await wait(260);
+      const g = s.full ? `<span class="ghost">  ⟶ ${esc(s.full)}</span>` : `<span class="ghost">${esc(s.ghost)}</span>`;
+      render(`<span class="p">❯</span> ${esc(t)}${g}<span class="why">${s.why}</span>`, false); await wait(1300);
+      const final = s.full || t + s.ghost;
+      render(`<span class="p">❯</span> ${esc(final)}`); await wait(420);
+      done.push(`<span class="p">❯</span> ${esc(final)} <span class="ok">✔</span>`); if (done.length > 6) done.shift();
+    }
+    await wait(1800);
+  }
+}
+// smart-mode terminal
+const sd = document.getElementById('smartdemo');
+const smart = [
+  '<span class="p">❯</span> ? <span class="rtl">حدّث النظام ونزّل كلود كود وسطّبه</span>', '',
+  '  <span class="hl">◆</span> <span class="rtl">حدس · الوضع الذكي</span>',
+  '  <span class="cmt">CachyOS · amd64 · fish · pacman, paru</span>', '',
+  '  <span class="hl">1</span>  <span class="rtl">تحديث النظام بالكامل</span>   <span class="hl">medium</span>',
+  '     <span class="p">$</span> sudo pacman -Syu --noconfirm',
+  '  <span class="hl">2</span>  <span class="rtl">تثبيت Claude Code</span>   <span class="hl">medium</span>',
+  '     <span class="p">$</span> curl -fsSL https://claude.ai/install.sh | bash',
+  '  <span class="hl">3</span>  <span class="rtl">التأكد من التثبيت</span>   <span class="ok">low</span>',
+  '     <span class="p">$</span> claude --version', '',
+  '  <span class="rtl">أنفّذ؟ [Enter] الكل · [s] خطوة بخطوة · [n] إلغاء</span>',
+  '  <span class="ok">✔ 3/3 · 1m42s</span>'];
+async function playSmart() {
+  if (reduce) { sd.innerHTML = smart.join('\n'); return; }
+  for (;;) { sd.innerHTML = ''; for (const l of smart) { sd.innerHTML += l + '\n'; await wait(l ? 240 : 110); } await wait(4200); }
+}
+
+// motion
+if (window.gsap && !reduce) {
+  gsap.registerPlugin(ScrollTrigger);
+  const h1 = document.getElementById('h1');
+  if (window.SplitText && lang === 'en') {
+    const split = SplitText.create(h1, {type: 'words', mask: 'words'});
+    gsap.from(split.words, {yPercent: 110, duration: 1.1, ease: 'expo.out', stagger: .05, delay: .1});
+  } else gsap.from(h1, {y: 30, opacity: 0, duration: 1, ease: 'expo.out', delay: .1});
+  gsap.from('[data-in]', {y: 24, opacity: 0, duration: 1, ease: 'expo.out', stagger: .08, delay: .35});
+  gsap.from('#heroTerm', {y: 60, opacity: 0, rotateX: 10, scale: .96, transformPerspective: 1200, duration: 1.4, ease: 'expo.out', delay: .3});
+  document.querySelectorAll('[data-count]').forEach(el => { const o = {v: 0}; gsap.to(o, {v: +el.dataset.count, duration: 1.6, delay: .6, ease: 'power3.out', onUpdate: () => el.textContent = Math.round(o.v)}); });
+  gsap.to('.b1', {x: '16vw', y: '10vh', duration: 16, repeat: -1, yoyo: true, ease: 'sine.inOut'});
+  gsap.to('.b2', {x: '-12vw', y: '-8vh', duration: 19, repeat: -1, yoyo: true, ease: 'sine.inOut'});
+  gsap.to('.b3', {x: '-10vw', y: '-14vh', scale: 1.15, duration: 21, repeat: -1, yoyo: true, ease: 'sine.inOut'});
+  document.querySelectorAll('section').forEach(sec => {
+    const items = sec.querySelectorAll('[data-rv]'); if (!items.length) return;
+    gsap.from(items, {y: 36, opacity: 0, duration: .9, ease: 'power3.out', stagger: .07, scrollTrigger: {trigger: sec, start: 'top 75%', once: true}});
+  });
+  gsap.from('#signals .bar i', {scaleX: 0, duration: 1.2, ease: 'expo.out', stagger: .12, scrollTrigger: {trigger: '#signals', start: 'top 80%', once: true}});
+  const term = document.getElementById('heroTerm');
+  if (matchMedia('(pointer:fine)').matches) addEventListener('pointermove', e => {
+    const x = e.clientX / innerWidth - .5, y = e.clientY / innerHeight - .5;
+    gsap.to(term, {rotateY: x * 5, rotateX: -y * 5, transformPerspective: 1200, duration: .8, ease: 'power2.out'});
+    gsap.to('.liquid', {x: x * 40, y: y * 40, duration: 2, ease: 'power2.out'});
+  });
+}
+play(); playSmart();
+</script>
+</body>
+</html>

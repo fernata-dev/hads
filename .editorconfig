@@ -1,0 +1,16 @@
+root = true
+
+[*]
+end_of_line = lf
+insert_final_newline = true
+charset = utf-8
+
+[*.go]
+indent_style = tab
+
+[Makefile]
+indent_style = tab
+
+[*.{md,yml,json,sh,zsh,bash,fish,ps1,html,css}]
+indent_style = space
+indent_size = 2

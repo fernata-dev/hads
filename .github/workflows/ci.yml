@@ -1,0 +1,67 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test · ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: vet
+        run: go vet ./...
+      - name: test
+        run: go test ./...
+      - name: race
+        if: runner.os == 'Linux'
+        run: go test -race ./...
+      - name: bench
+        if: runner.os == 'Linux'
+        run: go test -run xxx -bench . -benchtime 2000x ./internal/model/
+
+  shells:
+    name: shell scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh fish shellcheck
+      - run: go build -o hads ./cmd/hads
+      - name: syntax
+        run: |
+          ./hads init zsh  > /tmp/h.zsh  && zsh -n /tmp/h.zsh
+          ./hads init bash > /tmp/h.bash && bash -n /tmp/h.bash
+          ./hads init fish > /tmp/h.fish && fish -n /tmp/h.fish
+          sh -n scripts/install.sh
+      - name: shellcheck
+        run: shellcheck -S warning scripts/install.sh scripts/build.sh
+
+  cross:
+    name: cross-compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: VERSION=ci ./scripts/build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hads-binaries
+          path: dist/
+          retention-days: 7

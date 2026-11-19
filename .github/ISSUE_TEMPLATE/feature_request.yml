@@ -1,0 +1,11 @@
+name: Idea
+description: A prediction hads should make, or a feature it should have
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What should hads do?
+      description: If it's a prediction, show the commands before it and the one you expected.
+    validations:
+      required: true
