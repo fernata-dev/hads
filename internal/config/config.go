@@ -24,6 +24,15 @@ type Agent struct {
 	BaseURL        string `json:"base_url"`
 	AutoFix        bool   `json:"auto_fix"`
 	MaxFixAttempts int    `json:"max_fix_attempts"`
+	// Free models tried in order when the main model fails (bad output, rate limit, no credits).
+	Fallbacks []string `json:"fallbacks"`
+}
+
+// DefaultFallbacks are free OpenRouter models that plan well in Arabic and English.
+var DefaultFallbacks = []string{
+	"baidu/ernie-5.5-flash-preview:free",
+	"nvidia/nemotron-3-ultra-550b-a55b:free",
+	"inclusionai/ling-3.2-flash:free",
 }
 
 type Config struct {
@@ -58,6 +67,7 @@ func Default() *Config {
 			BaseURL:        DefaultBaseURL,
 			AutoFix:        true,
 			MaxFixAttempts: 2,
+			Fallbacks:      DefaultFallbacks,
 		},
 	}
 }
@@ -92,6 +102,9 @@ func Load() (*Config, error) {
 	}
 	if c.Agent.BaseURL == "" {
 		c.Agent.BaseURL = d.Agent.BaseURL
+	}
+	if c.Agent.Fallbacks == nil {
+		c.Agent.Fallbacks = DefaultFallbacks
 	}
 	if c.Agent.MaxFixAttempts <= 0 {
 		c.Agent.MaxFixAttempts = d.Agent.MaxFixAttempts

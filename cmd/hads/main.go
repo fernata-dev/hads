@@ -56,6 +56,19 @@ func main() {
 		err = cmdFind(rest)
 	case "ask", "do", "?", "؟":
 		err = cmdAsk(rest)
+	case "cnf":
+		// used by shell "command not found" hooks: exit 0 when the line is a natural-language request
+		words := rest
+		if len(words) > 0 && words[0] == "--" {
+			words = words[1:]
+		}
+		if len(words) == 2 && words[0] == "--b64" {
+			words = strings.Fields(b64(words[1]))
+		}
+		if !agent.LooksLikeRequest(words) {
+			os.Exit(1)
+		}
+		return
 	case "explain":
 		err = agent.Explain(strings.Join(rest, " "))
 	case "agent", "ai":

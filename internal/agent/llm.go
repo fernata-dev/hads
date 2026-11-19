@@ -40,7 +40,8 @@ type chatReq struct {
 type chatResp struct {
 	Choices []struct {
 		Message struct {
-			Content string `json:"content"`
+			Content   string `json:"content"`
+			Reasoning string `json:"reasoning"`
 		} `json:"message"`
 	} `json:"choices"`
 	Error *struct {
@@ -103,5 +104,9 @@ func (c *Client) chat(ctx context.Context, msgs []Msg, jsonMode bool, maxTokens 
 	if len(cr.Choices) == 0 {
 		return "", errors.New("empty response from model")
 	}
-	return cr.Choices[0].Message.Content, nil
+	msg := cr.Choices[0].Message
+	if strings.TrimSpace(msg.Content) == "" && msg.Reasoning != "" {
+		return msg.Reasoning, nil // reasoning models sometimes put everything there
+	}
+	return msg.Content, nil
 }

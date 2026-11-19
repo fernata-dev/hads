@@ -73,11 +73,21 @@ if (Get-Module PSReadLine -ErrorAction SilentlyContinue) {
     $line = $null; $cursor = $null
     [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
     $q = [string][char]0x061F
+    $bin = 'hads'
+    if (-not (Get-Command hads -ErrorAction SilentlyContinue)) { $bin = "& '" + ($global:__HadsBin -replace "'", "''") + "'" }
+    $req = $null
     if ($line.StartsWith('? ') -or $line.StartsWith($q + ' ')) {
-      $req = $line.Substring(2).Trim() -replace "'", "''"
-      $bin = 'hads'
-      if (-not (Get-Command hads -ErrorAction SilentlyContinue)) { $bin = "& '" + ($global:__HadsBin -replace "'", "''") + "'" }
-      [Microsoft.PowerShell.PSConsoleReadLine]::Replace(0, $line.Length, "$bin ask '$req'")
+      $req = $line.Substring(2).Trim()
+    } elseif ($line.Trim()) {
+      # a plain-language request typed as a command (Arabic, or an English sentence)
+      $first = ($line.Trim() -split '\s+')[0]
+      if ($first -notmatch '[\\/]' -and -not (Get-Command $first -ErrorAction SilentlyContinue)) {
+        & $global:__HadsBin cnf --b64 (__HadsB64 $line) 2>$null | Out-Null
+        if ($LASTEXITCODE -eq 0) { $req = $line.Trim() }
+      }
+    }
+    if ($req) {
+      [Microsoft.PowerShell.PSConsoleReadLine]::Replace(0, $line.Length, "$bin ask '" + ($req -replace "'", "''") + "'")
     }
     [Microsoft.PowerShell.PSConsoleReadLine]::AcceptLine()
   }

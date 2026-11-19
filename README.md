@@ -91,7 +91,7 @@ From source (Go 1.24+): `git clone https://github.com/fernata-dev/hads && cd had
 | Prediction appears | as ghost text while you type | on demand | on the right prompt | on demand |
 | Accept | <kbd>→</kbd> / <kbd>End</kbd> | <kbd>Ctrl</kbd>+<kbd>Space</kbd> | <kbd>Ctrl</kbd>+<kbd>Space</kbd> | <kbd>Ctrl</kbd>+<kbd>Space</kbd> |
 | Other predictions | <kbd>Alt</kbd>+<kbd>N</kbd> / <kbd>Alt</kbd>+<kbd>P</kbd> | <kbd>Alt</kbd>+<kbd>N</kbd> | <kbd>Alt</kbd>+<kbd>N</kbd> | <kbd>Alt</kbd>+<kbd>N</kbd> |
-| Smart mode | `? request` | `ask request` | `? request` | `? request` |
+| Smart mode | just type it | just type it | just type it | just type it |
 
 On an empty line the prediction is *what you'll do next*. While typing it's *how this line ends*.
 Already use **zsh-autosuggestions**? hads plugs in as its first strategy instead of replacing it.
@@ -125,12 +125,15 @@ $ hads status             # daemon, model and index
 ## Smart mode (Arabic & English)
 
 Off until you run `hads agent enable` with an [OpenRouter](https://openrouter.ai/keys) key (or set
-`OPENROUTER_API_KEY`). Then write what you want, in any mix of Arabic and English:
+`OPENROUTER_API_KEY`). Then just type what you want at the prompt, in any mix of Arabic and English.
+No prefix needed: a line that starts in Arabic, or an English sentence that isn't a command, goes to
+smart mode (`?` in front, `ask …`, or `hads ask "…"` also work).
 
 ```console
-$ ? حدّث النظام ونزّل كلود كود وسطّبه
-$ ? update the os and install claude code on my laptop
-$ ? copy my latest invoice pdf to the desktop
+$ حدّث النظام ونزّل كلود كود وسطّبه
+$ نزلي لعبة ممتعة لجهازي
+$ update the os and install claude code on my laptop
+$ copy my latest invoice pdf to the desktop
 ```
 
 ```text
@@ -161,7 +164,12 @@ How it stays safe:
 - **It can look things up on your disk.** For file tasks the model asks hads to search the index and
   plans with real paths.
 
-Default model: `anthropic/claude-sonnet-5.5`. Any OpenRouter model works: `hads agent model <id>`.
+**Free works.** Default model: `anthropic/claude-sonnet-5.5`, but any OpenRouter model works
+(`hads agent model <id>`). If your model fails (unusable output, rate limit, no credits, model gone),
+hads falls back to free models automatically, in order: `baidu/ernie-5.5-flash-preview:free`,
+`nvidia/nemotron-3-ultra-550b-a55b:free`, `inclusionai/ling-3.2-flash:free`. Weak models are handled too:
+hads accepts loose JSON, plain code blocks and `$ command` lines, and adds a missing `sudo` where the
+system needs it (never for AUR helpers or Homebrew). Run with `HADS_DEBUG=1` to see raw model replies.
 
 ## How it works
 
@@ -230,12 +238,13 @@ throttled and runs at low priority.
     "model": "anthropic/claude-sonnet-5.5",
     "base_url": "https://openrouter.ai/api/v1",   // any OpenAI-compatible endpoint
     "auto_fix": true,
-    "max_fix_attempts": 2
+    "max_fix_attempts": 2,
+    "fallbacks": ["baidu/ernie-5.5-flash-preview:free", "..."]   // tried in order if the model fails
   }
 }
 ```
 
-Environment: `HADS_HOME` (data dir), `HADS_LANG=ar|en` (interface language), `OPENROUTER_API_KEY`,
+Environment: `HADS_HOME` (data dir), `HADS_LANG=ar|en` (interface language), `OPENROUTER_API_KEY`, `HADS_DEBUG=1`,
 `NO_COLOR`, and in zsh `HADS_GHOST_STYLE` (default `fg=8`). In fish, `set -g hads_no_hint 1` hides
 the right-prompt hint.
 

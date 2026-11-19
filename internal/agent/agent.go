@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -104,65 +105,90 @@ HOW TO PLAN
   • Claude Code — macOS/Linux/WSL: curl -fsSL https://claude.ai/install.sh | bash   • Windows PowerShell: irm https://claude.ai/install.ps1 | iex   • alternative: npm install -g @anthropic-ai/claude-code (needs Node.js 18+)
   • Homebrew — NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
   • Rust — curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y     • uv — curl -LsSf https://astral.sh/uv/install.sh | sh     • Bun — curl -fsSL https://bun.sh/install | bash
+- On Arch-based systems never run "pacman -Sy" on its own (partial upgrades break systems): install with "pacman -Syu --needed --noconfirm <pkg>" or after a full upgrade.
 - "Update the system/OS" = the OS package manager's full upgrade (pacman -Syu --noconfirm, apt update && apt full-upgrade -y, dnf upgrade -y --refresh, zypper -n dup, brew update && brew upgrade, winget upgrade --all --silent --accept-package-agreements --accept-source-agreements, etc.).
 - For tasks on the user's files use real absolute paths from FILES results or user_dirs. If you must locate files first, return zero steps and put 1–3 short filename keywords in "lookup"; Hads searches its index of the disk and sends results back.
 - Add a final verification step when it makes sense (for example: claude --version).
 - Never do destructive things (deleting data, wiping disks, changing users/passwords, disabling security) unless the user explicitly asked for exactly that.
-- If the request is unclear, unsafe, or not a computer task, return zero steps and explain briefly in "notes".
+- If the request is open-ended but doable ("install a fun game", "a good video editor"), pick one well-known, well-reviewed option available through the listed package managers (prefer the official repos, then flatpak, then the AUR), name it in "summary", and plan it. Do not ask the user to choose.
+- Return zero steps only if the request is unsafe, impossible, or not a computer task; then explain briefly in "notes".
 
 LANGUAGE
-Write "summary", every "title" and "explain", and "notes" in the user's language: Egyptian Arabic if they wrote Arabic, English if English. Commands stay commands.
+Write "summary", every "title" and "explain", and "notes" in the user's language: Egyptian Arabic if they wrote Arabic, English if English. Commands stay commands. Write Arabic letters directly; never escape them as \\u sequences. Keep every text field short (one sentence).
 
 OUTPUT
 Reply with exactly ONE JSON object and nothing else:
 {"summary": string, "lookup": [string], "steps": [{"title": string, "command": string, "explain": string, "risk": "low"|"medium"|"high", "sudo": boolean}], "notes": string}`
 
-func parsePlan(s string) (Plan, error) {
-	var p Plan
-	s = strings.TrimSpace(s)
-	s = strings.TrimPrefix(s, "```json")
-	s = strings.TrimPrefix(s, "```")
-	s = strings.TrimSuffix(s, "```")
-	i, j := strings.Index(s, "{"), strings.LastIndex(s, "}")
-	if i < 0 || j <= i {
-		return p, errors.New("model did not return a plan")
-	}
-	err := json.Unmarshal([]byte(s[i:j+1]), &p)
-	return p, err
-}
-
 type session struct {
 	cfg    *config.Config
 	client *Client
+	models []string // remaining models to fall back to
 	info   sysinfo.Info
 	lang   string
 	msgs   []Msg
 	opts   Options
 }
 
+var debug = os.Getenv("HADS_DEBUG") != ""
+
 func (s *session) ask(ctx context.Context, user string, spin string) (Plan, error) {
 	s.msgs = append(s.msgs, Msg{Role: "user", Content: user})
-	sp := ui.Spin(spin)
-	out, err := s.client.Chat(ctx, s.msgs, true, 2500)
-	sp.Stop()
-	if err != nil {
-		return Plan{}, err
+	base := len(s.msgs) // conversation up to this request; failed replies are dropped on fallback
+	var lastErr error
+	var last string
+	for {
+		p, out, err := s.tryModel(ctx, spin)
+		if err == nil {
+			return p, nil
+		}
+		lastErr, last = err, out
+		var he *HTTPError
+		if errors.As(err, &he) && he.Status == 401 {
+			return Plan{}, err // a bad key won't work on any model
+		}
+		if len(s.models) == 0 {
+			break
+		}
+		next := s.models[0]
+		s.models = s.models[1:]
+		fmt.Fprintf(os.Stderr, "  %s %s %s\n", ui.Yellow("↻"), ui.Gray([2]string{"switching to", "بجرّب موديل تاني:"}[b2i(s.lang == "ar")]), ui.Cyan(next))
+		s.client.Model = next
+		s.msgs = s.msgs[:base]
 	}
-	s.msgs = append(s.msgs, Msg{Role: "assistant", Content: out})
-	p, err := parsePlan(out)
-	if err != nil {
-		// one retry asking for strict JSON
-		s.msgs = append(s.msgs, Msg{Role: "user", Content: "That was not valid JSON. Reply again with ONLY the JSON object."})
-		sp = ui.Spin(spin)
-		out, err = s.client.Chat(ctx, s.msgs, true, 2500)
+	if errors.Is(lastErr, errNoPlan) {
+		snippet := strings.TrimSpace(last)
+		if r := []rune(snippet); len(r) > 200 {
+			snippet = string(r[:200]) + "…"
+		}
+		return Plan{}, fmt.Errorf("%w (last model %s said %q). Try: hads agent model %s", errNoPlan, s.client.Model, snippet, config.DefaultFallbacks[0])
+	}
+	return Plan{}, lastErr
+}
+
+// tryModel gives the current model two chances to produce a usable plan.
+func (s *session) tryModel(ctx context.Context, spin string) (Plan, string, error) {
+	var out string
+	for attempt := 0; attempt < 2; attempt++ {
+		sp := ui.Spin(spin)
+		reply, err := s.client.Chat(ctx, s.msgs, attempt == 0, 2500)
 		sp.Stop()
 		if err != nil {
-			return Plan{}, err
+			return Plan{}, out, err
 		}
-		s.msgs = append(s.msgs, Msg{Role: "assistant", Content: out})
-		p, err = parsePlan(out)
+		out = reply
+		if debug {
+			fmt.Fprintf(os.Stderr, "\n--- %s (attempt %d) ---\n%s\n--- end ---\n", s.client.Model, attempt+1, reply)
+		}
+		s.msgs = append(s.msgs, Msg{Role: "assistant", Content: reply})
+		if p, err := parsePlan(reply); err == nil {
+			return p, reply, nil
+		}
+		s.msgs = append(s.msgs, Msg{Role: "user", Content: `Your reply could not be parsed. Reply with ONLY this JSON shape and nothing before or after it:
+{"summary":"<one sentence>","lookup":[],"steps":[{"title":"<short title>","command":"<the real shell command>","explain":"<one sentence>","risk":"low|medium|high","sudo":false}],"notes":"<optional>"}
+Fill every field with real content for the user's request; do not copy the angle-bracket hints.`})
 	}
-	return p, err
+	return Plan{}, out, errNoPlan
 }
 
 func lookupFiles(keys []string, cwd string) string {
@@ -230,6 +256,11 @@ func Run(request string, opts Options) error {
 	execSh, _ := sysinfo.ExecShell()
 
 	s := &session{cfg: cfg, client: NewClient(cfg.Agent.BaseURL, key, mdl), info: info, lang: lang, opts: opts}
+	for _, f := range cfg.Agent.Fallbacks {
+		if f != "" && f != mdl {
+			s.models = append(s.models, f)
+		}
+	}
 	s.msgs = []Msg{{Role: "system", Content: fmt.Sprintf(systemPrompt, infoJSON, filepath.Base(execSh))}}
 
 	fmt.Println()
@@ -293,6 +324,11 @@ func pad(s string, n int) string {
 
 func (s *session) showPlan(p *Plan, heading string) (hasHigh, hasBlocked bool) {
 	L := s.lang
+	if runtime.GOOS != "windows" && !s.info.IsRoot && s.info.HasSudo {
+		for i := range p.Steps {
+			p.Steps[i].Command = addSudo(p.Steps[i].Command, p.Steps[i].Sudo)
+		}
+	}
 	if p.Summary != "" {
 		fmt.Printf("  %s  %s\n\n", ui.Violet("✦"), ui.Bold(p.Summary))
 	} else {

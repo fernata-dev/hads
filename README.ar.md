@@ -73,7 +73,7 @@ irm https://raw.githubusercontent.com/fernata-dev/hads/main/scripts/install.ps1 
 | التوقّع بيظهر | وانت بتكتب | لما تطلبه | على يمين السطر | لما تطلبه |
 | تقبله | <kbd>→</kbd> | <kbd>Ctrl</kbd>+<kbd>Space</kbd> | <kbd>Ctrl</kbd>+<kbd>Space</kbd> | <kbd>Ctrl</kbd>+<kbd>Space</kbd> |
 | بدائل | <kbd>Alt</kbd>+<kbd>N</kbd> | <kbd>Alt</kbd>+<kbd>N</kbd> | <kbd>Alt</kbd>+<kbd>N</kbd> | <kbd>Alt</kbd>+<kbd>N</kbd> |
-| الوضع الذكي | `? طلبك` | `ask طلبك` | `? طلبك` | `? طلبك` |
+| الوضع الذكي | اكتبه على طول | اكتبه على طول | اكتبه على طول | اكتبه على طول |
 
 </div>
 
@@ -88,14 +88,15 @@ $ hads status           # حالة الديمون والنموذج والفهر�
 ## الوضع الذكي
 
 مقفول لحد ما تشغّل `hads agent enable` وتدخّل مفتاح [OpenRouter](https://openrouter.ai/keys). بعدها
-اكتب اللي عايزه بالعربي أو الإنجليزي أو الاتنين مع بعض:
+اكتب اللي عايزه على طول في التيرمنال، بالعربي أو الإنجليزي، **من غير أي علامة قبله**: أي سطر بيبدأ
+بالعربي، أو جملة إنجليزي مش أمر، بتروح للوضع الذكي لوحدها.
 
 </div>
 
 ```console
-$ ? حدّث النظام ونزّل كلود كود وسطّبه
-$ ? انسخ آخر فاتورة PDF على سطح المكتب
-$ ? update the os and install claude code
+$ حدّث النظام ونزّل كلود كود وسطّبه
+$ نزلي لعبة ممتعة لجهازي
+$ update the os and install claude code
 ```
 
 <div dir="rtl">
@@ -106,7 +107,9 @@ $ ? update the os and install claude code
   ممنوعة تمامًا، والخطيرة لازم تكتب `yes` عشان تتنفذ.
 - **بيصلّح الفشل:** لو خطوة فشلت بيبعت الخطأ للموديل ويعرض عليك الحل.
 
-الموديل الافتراضي `anthropic/claude-sonnet-5.5`، وتقدر تغيّره بـ `hads agent model <id>`.
+**المجاني شغّال.** الموديل الافتراضي `anthropic/claude-sonnet-5.5`، وتقدر تغيّره بـ `hads agent model <id>`. ولو
+موديلك فشل (رد مش مفهوم، ضغط، رصيد خلص)، حدس بيجرّب موديلات مجانية لوحده: `baidu/ernie-5.5-flash-preview:free`
+وبعده `nvidia/nemotron-3-ultra-550b-a55b:free` وبعده `inclusionai/ling-3.2-flash:free`. وبيضيف `sudo` لو الموديل نسيه.
 
 ## إزاي شغّال
 

@@ -63,6 +63,23 @@ if (( BASH_VERSINFO[0] >= 4 )); then
   bind -x '"\en": __hads_cycle' 2>/dev/null   # Alt+N
 fi
 
+# a plain-language request typed as a command (Arabic, or an English sentence) goes to smart mode
+if declare -F command_not_found_handle >/dev/null && ! declare -F __hads_orig_cnf >/dev/null; then
+  eval "$(declare -f command_not_found_handle | sed '1s/command_not_found_handle/__hads_orig_cnf/')"
+fi
+command_not_found_handle() {
+  if "$_HADS_BIN" cnf -- "$@" 2>/dev/null; then
+    "$_HADS_BIN" ask "$*"
+    return $?
+  fi
+  if declare -F __hads_orig_cnf >/dev/null; then
+    __hads_orig_cnf "$@"
+    return $?
+  fi
+  printf 'bash: %s: command not found\n' "$1" >&2
+  return 127
+}
+
 if ! type -t ask >/dev/null 2>&1; then
   ask() { "$_HADS_BIN" ask "$*"; }
 fi

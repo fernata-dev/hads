@@ -146,6 +146,14 @@ _hads_w_accept_line() {
   if [[ $BUFFER == ('? '|'؟ ')* ]]; then
     local req=${BUFFER[3,-1]}
     BUFFER="$(_hads_name) ask ${(q-)req}"
+  elif [[ -n $BUFFER ]]; then
+    # a plain-language request typed as a command (Arabic, or an English sentence)
+    local -a w=( ${(z)BUFFER} )
+    local first=${w[1]}
+    if [[ $first != */* ]] && (( ! $+commands[$first] && ! $+aliases[$first] && ! $+functions[$first] && ! $+builtins[$first] && ! ${reswords[(Ie)$first]} )) \
+       && "$_HADS_BIN" cnf -- "${w[@]}" 2>/dev/null; then
+      BUFFER="$(_hads_name) ask ${(q-)BUFFER}"
+    fi
   fi
   zle _hads_orig_$WIDGET -- "$@"
 }

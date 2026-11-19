@@ -62,11 +62,17 @@ end
 
 function __hads_enter
     set -l line (string join \n -- (commandline))
+    set -l bin hads
+    command -q hads; or set bin (string escape -- $__hads_bin)
     if string match -qr '^(\?|؟)\s+\S' -- $line
         set -l req (string replace -r '^(\?|؟)\s+' '' -- $line)
-        set -l bin hads
-        command -q hads; or set bin (string escape -- $__hads_bin)
         commandline -r -- "$bin ask "(string escape -- $req)
+    else if test -n "$line"
+        # a plain-language request typed as a command (Arabic, or an English sentence)
+        set -l words (string split -n ' ' -- $line)
+        if not string match -q '*/*' -- $words[1]; and not type -q -- $words[1]; and $__hads_bin cnf -- $words 2>/dev/null
+            commandline -r -- "$bin ask "(string escape -- $line)
+        end
     end
     commandline -f execute
 end
